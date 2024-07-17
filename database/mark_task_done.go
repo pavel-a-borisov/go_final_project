@@ -7,14 +7,16 @@ import (
 )
 
 // MarkTaskDone отмечает задачу как выполненную.
-func MarkTaskDone(id int) error {
+func MarkTaskDone(id string) error {
+
+	// Находим задачу
 	task, err := GetTaskByID(id)
 	if err != nil {
 		return err
 	}
 
+	// Если задача одноразовая, удаляем её
 	if task.Repeat == "" {
-		// Одноразовая задача, удаляем её
 		return DeleteTask(id)
 	}
 

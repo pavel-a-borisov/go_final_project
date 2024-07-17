@@ -6,7 +6,7 @@ import (
 )
 
 // DeleteTask удаляет задачу из базы данных.
-func DeleteTask(id int) error {
+func DeleteTask(id string) error {
 	query := `DELETE FROM scheduler WHERE id = :id`
 	result, err := db.Exec(query, sql.Named("id", id))
 	if err != nil {

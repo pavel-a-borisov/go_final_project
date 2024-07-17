@@ -2,9 +2,11 @@ package handlers
 
 import (
 	"dev/go_final_project/database"
-	"fmt"
+	"dev/go_final_project/fns"
+	"log"
 	"net/http"
 	"strconv"
+	"time"
 )
 
 // Обработчик POST-запроса для отметки задачи как выполненной
@@ -12,24 +14,58 @@ func HandleMarkTaskDone(w http.ResponseWriter, r *http.Request) {
 	// Получаем параметр id из строки запроса
 	idStr := r.URL.Query().Get("id")
 	if idStr == "" {
-		http.Error(w, `{"error":"Не указан идентификатор"}`, http.StatusBadRequest)
+		response := database.Response{ID: "error", Error: "Не указан идентификатор при отметке задачи"}
+		returnJSON(w, response, http.StatusBadRequest)
+		log.Printf("не указан идентификатор при отметке задачи: %v", http.StatusBadRequest)
 		return
 	}
 
-	id, err := strconv.Atoi(idStr)
+	_, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, `{"error":"Неправильный формат идентификатора"}`, http.StatusBadRequest)
+		response := database.Response{ID: "error", Error: "неправильный формат идентификатора при отметке задачи"}
+		returnJSON(w, response, http.StatusBadRequest)
+		log.Printf("неправильный формат идентификатора при отметке задачи: %v", err)
 		return
 	}
 
-	// Отмечаем задачу как выполненную в базе данных
-	err = database.MarkTaskDone(id)
+	// Находим задачу
+	task, err := database.GetTaskByID(idStr)
 	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"%v"}`, err), http.StatusInternalServerError)
+		response := database.Response{ID: "error", Error: "задача не найдена"}
+		returnJSON(w, response, http.StatusInternalServerError)
+		log.Printf("задача не найдена: %v", err)
 		return
 	}
 
-	// Возвращаем пустой JSON в случае успешного выполнения
-	w.Header().Set("Content-Type", "application/json")
-	w.Write([]byte(`{}`))
+	// Если задача одноразовая, удаляем её
+	if task.Repeat == "" {
+		err = database.DeleteTask(idStr)
+		if err != nil {
+			http.Error(w, `{"error":"ошибка при удалении одноразовой задачи"}`, http.StatusInternalServerError)
+			log.Printf("%v", err)
+			return
+		}
+
+	} else { // Периодическая задача, обновляем дату следующего выполнения
+		now := time.Now()
+		nextDate, err := fns.NextDate(now, task.Date, task.Repeat)
+		if err != nil {
+			http.Error(w, `{"error":"не удалось рассчитать следующую дату выполнения"}`, http.StatusInternalServerError)
+			log.Printf("не удалось рассчитать следующую дату выполнения: %v", err)
+			return
+		}
+
+		// Обновляем задачу с новой датой
+		task.Date = nextDate
+		err = database.UpdateTask(*task)
+		if err != nil {
+			http.Error(w, `{"error":"не удалось обновить задачу с новой датаой"}`, http.StatusInternalServerError)
+			log.Printf("%v", err)
+			return
+		}
+	}
+
+	// Возвращаем пустой JSON в случае успешного обновления
+	response := database.Response{ID: "", Error: ""}
+	returnJSON(w, response, http.StatusOK)
 }

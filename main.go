@@ -66,10 +66,4 @@ func main() {
 		log.Fatal(err)
 	}
 
-	//http.Handle("/", http.FileServer(http.Dir("./web")))
-
-	// Добавляем GET-обработчик для маршрута "/api/nextdate".
-	//http.HandleFunc("/api/nextdate", handlers.HandlerNextDate)
-
-	//http.ListenAndServe(":"+port, nil)
 }

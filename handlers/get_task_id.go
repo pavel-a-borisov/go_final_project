@@ -2,8 +2,7 @@ package handlers
 
 import (
 	"dev/go_final_project/database"
-	"encoding/json"
-	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 )
@@ -13,22 +12,29 @@ func HandleGetTaskByID(w http.ResponseWriter, r *http.Request) {
 	// Получаем параметр id из строки запроса
 	idStr := r.URL.Query().Get("id")
 	if idStr == "" {
-		http.Error(w, `{"error":"Не указан идентификатор"}`, http.StatusBadRequest)
+		response := database.Response{ID: "error", Error: "не указан идентификатор"}
+		returnJSON(w, response, http.StatusBadRequest)
+		log.Printf("не указан идентификатор")
 		return
 	}
 
-	id, err := strconv.Atoi(idStr)
+	_, err := strconv.Atoi(idStr)
 	if err != nil {
-		http.Error(w, `{"error":"Неправильный формат идентификатора"}`, http.StatusBadRequest)
+		response := database.Response{ID: "error", Error: "неправильный формат идентификатора"}
+		returnJSON(w, response, http.StatusBadRequest)
+		log.Printf("неправильный формат идентификатора: %v", err)
 		return
 	}
 
-	task, err := database.GetTaskByID(id)
+	task, err := database.GetTaskByID(idStr)
 	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"%v"}`, err), http.StatusNotFound)
+		response := database.Response{ID: "error", Error: "Ошибка при получении данных из базы"}
+		returnJSON(w, response, http.StatusBadRequest)
+		log.Printf("ошибка при получении данных из базы: %v", err)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(task)
+	// возвращаем задачу
+	returnJSON(w, task, http.StatusOK)
+
 }

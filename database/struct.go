@@ -2,7 +2,7 @@ package database
 
 // Структура для задачи
 type Task struct {
-	ID      int    `json:"id"`
+	ID      string `json:"id"`
 	Date    string `json:"date"`
 	Title   string `json:"title"`
 	Comment string `json:"comment"`
@@ -11,7 +11,7 @@ type Task struct {
 
 // Структура для ответа
 type Response struct {
-	ID    int    `json:"id,omitempty"`
+	ID    string `json:"id,omitempty"`
 	Error string `json:"error,omitempty"`
 }
 
