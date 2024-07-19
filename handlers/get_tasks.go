@@ -17,12 +17,12 @@ func HandleGetTasks(w http.ResponseWriter, r *http.Request) {
 	tasks, err := database.GetTasks(search, limit)
 	if err != nil {
 		response := database.Response{ID: "error", Error: fmt.Sprintf("ошибка получения задач: %v", err)}
-		returnJSON(w, response, http.StatusInternalServerError)
+		ReturnJSON(w, response, http.StatusInternalServerError)
 		log.Printf("oшибка при получении задач: %v", err)
 		return
 	}
 
 	// выводим задачи
 	response := map[string]interface{}{"tasks": tasks}
-	returnJSON(w, response, http.StatusOK)
+	ReturnJSON(w, response, http.StatusOK)
 }

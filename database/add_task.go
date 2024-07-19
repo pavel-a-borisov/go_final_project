@@ -2,12 +2,11 @@ package database
 
 import (
 	"database/sql"
+	"dev/go_final_project/fns"
 	"errors"
 	"fmt"
 	"strconv"
 	"time"
-
-	"dev/go_final_project/fns"
 
 	_ "github.com/mattn/go-sqlite3"
 )

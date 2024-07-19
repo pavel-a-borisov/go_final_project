@@ -15,7 +15,7 @@ func HandleMarkTaskDone(w http.ResponseWriter, r *http.Request) {
 	idStr := r.URL.Query().Get("id")
 	if idStr == "" {
 		response := database.Response{ID: "error", Error: "Не указан идентификатор при отметке задачи"}
-		returnJSON(w, response, http.StatusBadRequest)
+		ReturnJSON(w, response, http.StatusBadRequest)
 		log.Printf("не указан идентификатор при отметке задачи: %v", http.StatusBadRequest)
 		return
 	}
@@ -23,7 +23,7 @@ func HandleMarkTaskDone(w http.ResponseWriter, r *http.Request) {
 	_, err := strconv.Atoi(idStr)
 	if err != nil {
 		response := database.Response{ID: "error", Error: "неправильный формат идентификатора при отметке задачи"}
-		returnJSON(w, response, http.StatusBadRequest)
+		ReturnJSON(w, response, http.StatusBadRequest)
 		log.Printf("неправильный формат идентификатора при отметке задачи: %v", err)
 		return
 	}
@@ -32,7 +32,7 @@ func HandleMarkTaskDone(w http.ResponseWriter, r *http.Request) {
 	task, err := database.GetTaskByID(idStr)
 	if err != nil {
 		response := database.Response{ID: "error", Error: "задача не найдена"}
-		returnJSON(w, response, http.StatusInternalServerError)
+		ReturnJSON(w, response, http.StatusInternalServerError)
 		log.Printf("задача не найдена: %v", err)
 		return
 	}
@@ -67,5 +67,5 @@ func HandleMarkTaskDone(w http.ResponseWriter, r *http.Request) {
 
 	// Возвращаем пустой JSON в случае успешного обновления
 	response := database.Response{ID: "", Error: ""}
-	returnJSON(w, response, http.StatusOK)
+	ReturnJSON(w, response, http.StatusOK)
 }

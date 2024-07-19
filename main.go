@@ -2,6 +2,7 @@ package main
 
 import (
 	"dev/go_final_project/database"
+	"dev/go_final_project/fns"
 	"dev/go_final_project/handlers"
 	"dev/go_final_project/tests"
 	"log"
@@ -11,7 +12,39 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/joho/godotenv"
 )
+
+// Реализация middleware для проверки аутентификации
+func auth(next http.HandlerFunc) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// получение пароля из переменной окружения
+		pass := os.Getenv("TODO_PASSWORD")
+		if len(pass) > 0 {
+			var jwt string // JWT-токен из куки
+			// получение куки
+			cookie, err := r.Cookie("token")
+			if err == nil {
+				jwt = cookie.Value
+			}
+
+			var valid bool
+			if jwt != "" {
+				hash, err := fns.ValidateJWT(jwt)
+				if err == nil && hash == "someHashBasedOnPassword" { // Используйте реальную проверку хеша
+					valid = true
+				}
+			}
+
+			if !valid {
+				response := database.Response{ID: "error", Error: "аутентификация требуется"}
+				handlers.ReturnJSON(w, response, http.StatusUnauthorized)
+				return
+			}
+		}
+		next(w, r)
+	})
+}
 
 func main() {
 	// Открываем лог файл
@@ -23,6 +56,12 @@ func main() {
 	defer logFile.Close()
 
 	log.SetOutput(logFile)
+
+	// Загрузка переменных окружения из файла .env
+	err = godotenv.Load()
+	if err != nil {
+		log.Fatalf("ошибка загрузки файла .env: %v", err)
+	}
 
 	// Подключаем БД
 	db, err := database.ConnectDB()
@@ -37,6 +76,11 @@ func main() {
 		port = strconv.Itoa(tests.Port)
 	}
 
+	pass := os.Getenv("TODO_PASSWORD")
+	if pass == "" {
+		pass = "12345"
+	}
+
 	// Создаём новый роутер chi
 	r := chi.NewRouter()
 	// Добавляем встроенные middleware для логирования и восстановления после паник
@@ -46,20 +90,22 @@ func main() {
 	fs := http.FileServer(http.Dir("./web"))
 	r.Handle("/*", fs)
 
+	// Регистрация маршрутов
+	r.Post("/api/signin", handlers.HandleSignIn)
 	// обработчик API для вычисления следующей даты
-	r.Get("/api/nextdate", handlers.HandleNextDate)
+	r.Get("/api/nextdate", auth(handlers.HandleNextDate))
 	// обработчик API для добавления новой задачи
-	r.Post("/api/task", handlers.HandleAddTask)
+	r.Post("/api/task", auth(handlers.HandleAddTask))
 	// обработчик API для вывода ближайших задач и поиска.
-	r.Get("/api/tasks", handlers.HandleGetTasks)
+	r.Get("/api/tasks", auth(handlers.HandleGetTasks))
 	// обработчик API для обновления задачи по ID.
-	r.Put("/api/task", handlers.HandleUpdateTask)
+	r.Put("/api/task", auth(handlers.HandleUpdateTask))
 	// обработчик API для вывода задачи по ID.
-	r.Get("/api/task", handlers.HandleGetTaskByID)
+	r.Get("/api/task", auth(handlers.HandleGetTaskByID))
 	// обработчик API для отметки о выполнении задачи по ID.
-	r.Post("/api/task/done", handlers.HandleMarkTaskDone)
+	r.Post("/api/task/done", auth(handlers.HandleMarkTaskDone))
 	// обработчик API для удаления задачи по ID.
-	r.Delete("/api/task", handlers.HandleDeleteTask)
+	r.Delete("/api/task", auth(handlers.HandleDeleteTask))
 
 	err = http.ListenAndServe(":"+port, r)
 	if err != nil {
