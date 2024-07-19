@@ -91,7 +91,10 @@ func main() {
 	r.Handle("/*", fs)
 
 	// Регистрация маршрутов
+<<<<<<< HEAD
 	r.Post("/api/signin", handlers.HandleSignIn)
+=======
+>>>>>>> 5d93f85d1bc63456c16e5d3d8d052f0db23de83a
 	// обработчик API для вычисления следующей даты
 	r.Get("/api/nextdate", auth(handlers.HandleNextDate))
 	// обработчик API для добавления новой задачи
