@@ -29,14 +29,25 @@ func auth(next http.HandlerFunc) http.HandlerFunc {
 			}
 
 			var valid bool
+			// Код для валидации и проверки JWT-токена
 			if jwt != "" {
 				hash, err := fns.ValidateJWT(jwt)
 				if err == nil && hash == "someHashBasedOnPassword" { // Используйте реальную проверку хеша
 					valid = true
+				} else {
+					// Лог для отладки ошибок валидации токена
+					if err != nil {
+						log.Printf("ошибка при валидации токена: %v", err)
+					}
+					if hash != "someHashBasedOnPassword" {
+						log.Printf("неправильный хеш токена: %s", hash)
+					}
 				}
 			}
 
 			if !valid {
+				// возвращаем ошибку авторизации 401
+				//http.Error(w, "Authentification required", http.StatusUnauthorized)
 				response := database.Response{ID: "error", Error: "аутентификация требуется"}
 				handlers.ReturnJSON(w, response, http.StatusUnauthorized)
 				return
@@ -76,11 +87,6 @@ func main() {
 		port = strconv.Itoa(tests.Port)
 	}
 
-	pass := os.Getenv("TODO_PASSWORD")
-	if pass == "" {
-		pass = "12345"
-	}
-
 	// Создаём новый роутер chi
 	r := chi.NewRouter()
 	// Добавляем встроенные middleware для логирования и восстановления после паник
@@ -91,10 +97,7 @@ func main() {
 	r.Handle("/*", fs)
 
 	// Регистрация маршрутов
-<<<<<<< HEAD
 	r.Post("/api/signin", handlers.HandleSignIn)
-=======
->>>>>>> 5d93f85d1bc63456c16e5d3d8d052f0db23de83a
 	// обработчик API для вычисления следующей даты
 	r.Get("/api/nextdate", auth(handlers.HandleNextDate))
 	// обработчик API для добавления новой задачи

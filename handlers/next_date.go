@@ -1,13 +1,14 @@
 package handlers
 
 import (
+	"dev/go_final_project/database"
 	"dev/go_final_project/fns"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 )
 
-// Обработчик GET-запроса для получения следующей даты
 func HandleNextDate(w http.ResponseWriter, r *http.Request) {
 	nowStr := r.FormValue("now")
 	dateStr := r.FormValue("date")
@@ -15,15 +16,20 @@ func HandleNextDate(w http.ResponseWriter, r *http.Request) {
 
 	now, err := time.Parse(fns.FormatDate, nowStr)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Неверный формат текущей даты: %v", err), http.StatusBadRequest)
+		response := database.Response{ID: "error", Error: fmt.Sprintf("неверный формат текущей даты: %v", err)}
+		ReturnJSON(w, response, http.StatusBadRequest)
+		log.Printf("неверный формат текущей даты: %v", err)
 		return
 	}
 
 	result, err := fns.NextDate(now, dateStr, repeat)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Ошибка: %v", err), http.StatusBadRequest)
+		response := database.Response{ID: "error", Error: fmt.Sprintf("Ошибка: %v", err)}
+		ReturnJSON(w, response, http.StatusBadRequest)
+		log.Printf("ошибка при расчете следующей даты: %v", err)
 		return
 	}
 
-	w.Write([]byte(result))
+	response := map[string]interface{}{"next_date": result}
+	ReturnJSON(w, response, http.StatusOK)
 }
