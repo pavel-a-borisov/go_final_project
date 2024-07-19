@@ -5,5 +5,7 @@
 .vscode/
 
 # Изключаем файл error и файл scheduler.sql 
-error.log
 scheduler.sql
+
+# Исключаем лог-файлы
+*.log
