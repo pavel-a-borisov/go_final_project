@@ -47,8 +47,8 @@ func auth(next http.HandlerFunc) http.HandlerFunc {
 
 			if !valid {
 				// возвращаем ошибку авторизации 401
-				//http.Error(w, "Authentification required", http.StatusUnauthorized)
-				response := database.Response{ID: "error", Error: "аутентификация требуется"}
+				//http.Error(w, "требуется аутентификация", http.StatusUnauthorized)
+				response := database.Response{ID: "error", Error: "требуется аутентификация"}
 				handlers.ReturnJSON(w, response, http.StatusUnauthorized)
 				return
 			}
@@ -99,7 +99,7 @@ func main() {
 	// Регистрация маршрутов
 	r.Post("/api/signin", handlers.HandleSignIn)
 	// обработчик API для вычисления следующей даты
-	r.Get("/api/nextdate", auth(handlers.HandleNextDate))
+	r.Get("/api/nextdate", handlers.HandleNextDate)
 	// обработчик API для добавления новой задачи
 	r.Post("/api/task", auth(handlers.HandleAddTask))
 	// обработчик API для вывода ближайших задач и поиска.
