@@ -1,0 +1,9 @@
+# Изключаем исполняемые файлы
+*.exe
+
+# Исключаем директорию .vscode
+.vscode/
+
+# Изключаем файл error и файл scheduler.sql 
+error
+scheduler.sql

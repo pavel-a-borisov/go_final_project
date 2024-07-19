@@ -46,6 +46,7 @@ func main() {
 	fs := http.FileServer(http.Dir("./web"))
 	r.Handle("/*", fs)
 
+	// Регистрация маршрутов
 	// обработчик API для вычисления следующей даты
 	r.Get("/api/nextdate", handlers.HandleNextDate)
 	// обработчик API для добавления новой задачи
