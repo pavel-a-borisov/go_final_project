@@ -4,7 +4,7 @@
 # Исключаем директорию .vscode
 .vscode/
 
-# Изключаем файл error и файл scheduler.sql 
+# Изключаем файл scheduler.sql 
 scheduler.sql
 
 # Исключаем лог-файлы
