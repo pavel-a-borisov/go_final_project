@@ -20,28 +20,23 @@ const (
 	filepath_db = "scheduler.db"
 )
 
-// App - структура приложения с базой данных и сервисом задач
-type App struct {
-	DB          *db.DB
-	TaskService service.TaskServiceInterface
-}
-
 // Настройка логирования
-func setupLogging() *os.File {
+func setupLogging() (*os.File, error) {
 	logFile, err := os.OpenFile("error.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
-		log.Fatalf("ошибка открытия log-файла: %v", err)
+		return nil, fmt.Errorf("ошибка открытия log-файла: %v", err)
 	}
 	log.SetOutput(logFile)
-	return logFile
+	return logFile, nil
 }
 
 // Загрузка переменных окружения из файла .env
-func loadEnvVariables() {
+func loadEnvVariables() error {
 	err := godotenv.Load()
 	if err != nil {
-		log.Fatalf("ошибка загрузки файла .env: %v", err)
+		return fmt.Errorf("ошибка загрузки файла .env: %v", err)
 	}
+	return nil
 }
 
 // Получение порта из переменных окружения
@@ -54,24 +49,24 @@ func getPort() string {
 }
 
 // Получение пути к файлу базы данных из переменной окружения или директории приложения
-func getFileDB() string {
+func getFileDB() (string, error) {
 	fileDB := os.Getenv("TODO_DBFILE")
 	if fileDB == "" {
 		appPath, err := os.Executable()
 		if err != nil {
-			log.Fatalf("не удалось получить путь к приложению: %v", err)
+			return "", fmt.Errorf("не удалось получить путь к приложению: %v", err)
 		}
 		fileDB = filepath.Join(filepath.Dir(appPath), filepath_db)
 	}
-	return fileDB
+	return fileDB, nil
 }
 
 // Инициализация приложения и подключение к базе данных
-func initializeApp(connectionString string) (*App, error) {
+func initializeApp(connectionString string) (*handlers.App, error) {
 	// Подключаем БД
 	conn, err := db.ConnectDB(connectionString)
 	if err != nil {
-		return nil, fmt.Errorf("ошибка при подключении к базе данных: %w", err)
+		return nil, fmt.Errorf("ошибка при подключении к базе данных: %v", err.Error())
 	}
 
 	// Инициализация объекта DB
@@ -80,8 +75,7 @@ func initializeApp(connectionString string) (*App, error) {
 	// Инициализация объекта TaskService
 	taskService := service.NewTaskService(db)
 
-	app := &App{
-		DB:          db,
+	app := &handlers.App{
 		TaskService: taskService,
 	}
 
@@ -90,25 +84,35 @@ func initializeApp(connectionString string) (*App, error) {
 
 func main() {
 	// Открываем лог файл
-	logFile := setupLogging()
+	logFile, err := setupLogging()
+	if err != nil {
+		log.Fatalf(err.Error())
+	}
 	defer logFile.Close()
 
 	log.SetOutput(logFile)
 
 	// Загрузка переменных окружения из файла .env
-	loadEnvVariables()
-
+	err = loadEnvVariables()
+	if err != nil {
+		log.Fatalf(err.Error())
+	}
 	// получаем номер порта
 	port := getPort()
 
 	// получение пароля из переменной окружения
 	pass := os.Getenv("TODO_PASSWORD")
 
-	app, err := initializeApp(getFileDB())
+	file_db, err := getFileDB()
 	if err != nil {
-		log.Fatalf("ошибка при подключении к базе данных: %v", err)
+		log.Fatalf(err.Error())
 	}
-	defer app.DB.Conn.Close() // Закрытие соединения с базой данных
+
+	app, err := initializeApp(file_db)
+	if err != nil {
+		log.Fatalf(err.Error())
+	}
+	defer app.TaskService.(*service.TaskService).DB.Conn.Close() // Закрытие соединения с базой данных
 
 	// Создаём новый роутер chi
 	r := chi.NewRouter()
@@ -125,38 +129,26 @@ func main() {
 		r.Use(handlers.Auth(pass)) // Применение middleware для аутентификации
 
 		// обработчик API для добавления новой задачи
-		r.Post("/api/task", func(w http.ResponseWriter, r *http.Request) {
-			handlers.HandleAddTask(app.TaskService, w, r)
-		})
+		r.Post("/api/task", app.HandleAddTask)
+
 		// обработчик API для вывода ближайших задач и поиска.
-		r.Get("/api/tasks", func(w http.ResponseWriter, r *http.Request) {
-			handlers.HandleGetTasks(app.TaskService, w, r)
-		})
+		r.Get("/api/tasks", app.HandleGetTasks)
 
 		// обработчик API для обновления задачи по ID.
-		r.Put("/api/task", func(w http.ResponseWriter, r *http.Request) {
-			handlers.HandleUpdateTask(app.TaskService, w, r)
-		})
+		r.Put("/api/task", app.HandleUpdateTask)
 
 		// обработчик API для вывода задачи по ID.
-		r.Get("/api/task", func(w http.ResponseWriter, r *http.Request) {
-			handlers.HandleGetTaskByID(app.TaskService, w, r)
-		})
+		r.Get("/api/task", app.HandleGetTaskByID)
+
 		// обработчик API для отметки о выполнении задачи по ID.
-		r.Post("/api/task/done", func(w http.ResponseWriter, r *http.Request) {
-			handlers.HandleMarkTaskDone(app.TaskService, w, r)
-		})
+		r.Post("/api/task/done", app.HandleMarkTaskDone)
 		// обработчик API для удаления задачи по ID.
-		r.Delete("/api/task", func(w http.ResponseWriter, r *http.Request) {
-			handlers.HandleDeleteTask(app.TaskService, w, r)
-		})
+		r.Delete("/api/task", app.HandleDeleteTask)
 	})
 
 	// Открытые маршруты
 	// обработчик API для вычисления следующей даты
-	r.Get("/api/nextdate", func(w http.ResponseWriter, r *http.Request) {
-		handlers.HandleNextDate(app.TaskService, w, r)
-	})
+	r.Get("/api/nextdate", app.HandleNextDate)
 
 	// маршрут для аутентификации
 	r.Post("/api/signin", handlers.HandleSignIn)

@@ -18,17 +18,13 @@ const (
 	FormatDate = "20060102"
 )
 
-// Функция для централизованного обработки JSON ответов
-func ReturnJSON(w http.ResponseWriter, response interface{}, statusCode int) {
-	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	w.WriteHeader(statusCode)
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusInternalServerError)
-	}
+// App - структура приложения
+type App struct {
+	TaskService service.TaskServiceInterface
 }
 
 // HandleNextDate - обработчик GET-запроса для вычисления следующей даты для повторяемых задач
-func HandleNextDate(taskService service.TaskServiceInterface, w http.ResponseWriter, r *http.Request) {
+func (a *App) HandleNextDate(w http.ResponseWriter, r *http.Request) {
 	nowStr := r.FormValue("now")
 	dateStr := r.FormValue("date")
 	repeat := r.FormValue("repeat")
@@ -39,17 +35,21 @@ func HandleNextDate(taskService service.TaskServiceInterface, w http.ResponseWri
 		return
 	}
 
-	result, err := taskService.NextDate(now, dateStr, repeat)
+	result, err := a.TaskService.NextDate(now, dateStr, repeat)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Ошибка: %v", err), http.StatusBadRequest)
 		return
 	}
 
-	w.Write([]byte(result))
+	_, err = w.Write([]byte(result))
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Ошибка записи ответа: %v", err), http.StatusInternalServerError)
+		log.Printf("ошибка записи ответа: %v", err)
+	}
 }
 
 // HandleAddTask - обработчик POST-запроса для добавления задачи
-func HandleAddTask(taskService service.TaskServiceInterface, w http.ResponseWriter, r *http.Request) {
+func (a *App) HandleAddTask(w http.ResponseWriter, r *http.Request) {
 	var task model.Task
 
 	// Декодирование JSON-запроса в структуру Task
@@ -61,7 +61,7 @@ func HandleAddTask(taskService service.TaskServiceInterface, w http.ResponseWrit
 	}
 
 	// Добавление задачи в базу данных
-	id, err := taskService.AddTask(task)
+	id, err := a.TaskService.AddTask(task)
 	if err != nil {
 		response := model.Response{ID: "error", Error: fmt.Sprintf("ошибка добавления задачи в базу: %v", err)}
 		ReturnJSON(w, response, http.StatusInternalServerError)
@@ -75,11 +75,11 @@ func HandleAddTask(taskService service.TaskServiceInterface, w http.ResponseWrit
 }
 
 // HandleGetTasks - обработчик GET-запроса для получения списка задач
-func HandleGetTasks(taskService service.TaskServiceInterface, w http.ResponseWriter, r *http.Request) {
+func (a *App) HandleGetTasks(w http.ResponseWriter, r *http.Request) {
 	// Получаем параметр search из строки запроса
 	search := r.URL.Query().Get("search")
 
-	tasks, err := taskService.GetTasks(search, limit)
+	tasks, err := a.TaskService.GetTasks(search, limit)
 	if err != nil {
 		response := model.Response{ID: "error", Error: fmt.Sprintf("ошибка получения задач: %v", err)}
 		ReturnJSON(w, response, http.StatusInternalServerError)
@@ -93,7 +93,7 @@ func HandleGetTasks(taskService service.TaskServiceInterface, w http.ResponseWri
 }
 
 // HandleUpdateTask - обработчик PUT-запроса для обновления задачи
-func HandleUpdateTask(taskService service.TaskServiceInterface, w http.ResponseWriter, r *http.Request) {
+func (a *App) HandleUpdateTask(w http.ResponseWriter, r *http.Request) {
 	var task model.Task
 
 	// Декодирование JSON-запроса в структуру Task
@@ -105,7 +105,7 @@ func HandleUpdateTask(taskService service.TaskServiceInterface, w http.ResponseW
 	}
 
 	// Обновление задачи в базе данных
-	err := taskService.UpdateTask(model.Task{
+	err := a.TaskService.UpdateTask(model.Task{
 		ID:      task.ID,
 		Date:    task.Date,
 		Title:   task.Title,
@@ -125,7 +125,7 @@ func HandleUpdateTask(taskService service.TaskServiceInterface, w http.ResponseW
 }
 
 // HandleGetTaskByID - обработчик GET-запроса для получения задачи по идентификатору
-func HandleGetTaskByID(taskService service.TaskServiceInterface, w http.ResponseWriter, r *http.Request) {
+func (a App) HandleGetTaskByID(w http.ResponseWriter, r *http.Request) {
 	// Получаем параметр id из строки запроса
 	idStr := r.URL.Query().Get("id")
 	if idStr == "" {
@@ -143,7 +143,7 @@ func HandleGetTaskByID(taskService service.TaskServiceInterface, w http.Response
 		return
 	}
 
-	task, err := taskService.GetTaskByID(idStr)
+	task, err := a.TaskService.GetTaskByID(idStr)
 	if err != nil {
 		response := model.Response{ID: "error", Error: "Ошибка при получении данных из базы"}
 		ReturnJSON(w, response, http.StatusBadRequest)
@@ -156,7 +156,7 @@ func HandleGetTaskByID(taskService service.TaskServiceInterface, w http.Response
 }
 
 // HandleMarkTaskDone - обработчик POST-запроса для отметки задачи как выполненной
-func HandleMarkTaskDone(taskService service.TaskServiceInterface, w http.ResponseWriter, r *http.Request) {
+func (a *App) HandleMarkTaskDone(w http.ResponseWriter, r *http.Request) {
 	// Получаем параметр id из строки запроса
 	idStr := r.URL.Query().Get("id")
 	if idStr == "" {
@@ -175,7 +175,7 @@ func HandleMarkTaskDone(taskService service.TaskServiceInterface, w http.Respons
 	}
 
 	// Находим задачу
-	task, err := taskService.GetTaskByID(idStr)
+	task, err := a.TaskService.GetTaskByID(idStr)
 	if err != nil {
 		response := model.Response{ID: "error", Error: "задача не найдена"}
 		ReturnJSON(w, response, http.StatusInternalServerError)
@@ -185,7 +185,7 @@ func HandleMarkTaskDone(taskService service.TaskServiceInterface, w http.Respons
 
 	// Если задача одноразовая, удаляем её
 	if task.Repeat == "" {
-		err = taskService.DeleteTask(idStr)
+		err = a.TaskService.DeleteTask(idStr)
 		if err != nil {
 			http.Error(w, `{"error":"ошибка при удалении одноразовой задачи"}`, http.StatusInternalServerError)
 			log.Printf("%v", err)
@@ -203,7 +203,7 @@ func HandleMarkTaskDone(taskService service.TaskServiceInterface, w http.Respons
 
 		// Обновляем задачу с новой датой
 		task.Date = nextDate
-		err = taskService.UpdateTask(*task)
+		err = a.TaskService.UpdateTask(*task)
 		if err != nil {
 			http.Error(w, `{"error":"не удалось обновить задачу с новой датаой"}`, http.StatusInternalServerError)
 			log.Printf("%v", err)
@@ -217,7 +217,7 @@ func HandleMarkTaskDone(taskService service.TaskServiceInterface, w http.Respons
 }
 
 // HandleDeleteTask - обработчик DELETE-запроса для удаления задачи по идентификатору
-func HandleDeleteTask(taskService service.TaskServiceInterface, w http.ResponseWriter, r *http.Request) {
+func (a App) HandleDeleteTask(w http.ResponseWriter, r *http.Request) {
 	// Получаем параметр id из строки запроса
 	idStr := r.URL.Query().Get("id")
 	if idStr == "" {
@@ -236,7 +236,7 @@ func HandleDeleteTask(taskService service.TaskServiceInterface, w http.ResponseW
 	}
 
 	// Удаляем задачу из базы данных
-	err = taskService.DeleteTask(idStr)
+	err = a.TaskService.DeleteTask(idStr)
 	if err != nil {
 		response := model.Response{ID: "error", Error: "ошибка при удалении задачи из базы"}
 		ReturnJSON(w, response, http.StatusInternalServerError)
@@ -295,4 +295,13 @@ func HandleSignIn(w http.ResponseWriter, r *http.Request) {
 	// Возвращение успешного ответа
 	response := map[string]string{"token": token}
 	ReturnJSON(w, response, http.StatusOK)
+}
+
+// Функция для централизованного обработки JSON ответов
+func ReturnJSON(w http.ResponseWriter, response interface{}, statusCode int) {
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	w.WriteHeader(statusCode)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, `{"error": "`+err.Error()+`"}`, http.StatusInternalServerError)
+	}
 }
