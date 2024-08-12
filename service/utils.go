@@ -1,4 +1,4 @@
-package fns
+package service
 
 import (
 	"errors"
@@ -9,8 +9,10 @@ import (
 	"time"
 )
 
-const FormatDate = "20060102"
-const ShortFormatDate = "02.01.2006"
+const (
+	FormatDate      = "20060102"
+	ShortFormatDate = "02.01.2006"
+)
 
 func NextDate(now time.Time, dateStr string, repeat string) (string, error) {
 	//Если правило повторения не указано, возвращается ошибка.

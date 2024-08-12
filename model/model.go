@@ -1,4 +1,4 @@
-package database
+package model
 
 // Структура для задачи
 type Task struct {
